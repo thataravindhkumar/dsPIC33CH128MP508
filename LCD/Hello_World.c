@@ -1,6 +1,5 @@
 #include "xc.h"
 #include <stdint.h>
-#include <string.h>
 
 // CONFIGURATION BITS
 #pragma config FNOSC = FRC  // Internal Fast RC oscillator
@@ -8,9 +7,19 @@
 // Simple delay function (approximate, not precise)
 void delay_ms(uint16_t ms) {
     while (ms--) {
-        for (volatile uint16_t i = 0; i < 5000; i++) {
-            Nop();  // Do nothing, just waste time
+        uint16_t i = 1000;  // 4 cycles per iteration, so 1000 x 4 = 4000 cycles (1 ms)
+        
+        while (i--) {
+            asm("repeat #3");  // Repeat NOP 3 times (4 cycles total)
+            asm("nop");
         }
+    }
+}
+
+void __delay_us(unsigned int microseconds) {
+    while (microseconds--) {
+        asm("repeat #12");  // 12 instruction cycles
+        asm("nop");         // Do nothing, just waste time
     }
 }
 
@@ -25,9 +34,9 @@ void delay_ms(uint16_t ms) {
 // Function to pulse the Enable pin (lets LCD know data is ready)
 void LCD_EnablePulse() {
     EN = 1;
-    delay_ms(1);  // Small delay (Enable pulse width)
+    __delay_us(1);  // Small delay (Enable pulse width)
     EN = 0;
-    delay_ms(1);
+    __delay_us(1);  // Small delay (Enable pulse width)
 }
 
 // Send 4 bits of data to the LCD
@@ -52,7 +61,6 @@ void LCD_Char(unsigned char data) {
     RS = 1;  // Data mode
     LCD_Send4Bits(data >> 4);  // Send higher nibble
     LCD_Send4Bits(data & 0x0F);  // Send lower nibble
-    delay_ms(2);  // Wait for data to display
 }
 
 // Send a string (text) to the LCD
